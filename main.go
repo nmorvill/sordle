@@ -370,9 +370,10 @@ func getNMostSubscribedPlayers(n int) []playersub {
 	sort.Slice(players, func(i, j int) bool {
 		return players[i].Subscriptions > players[j].Subscriptions
 	})
+	players = players[:n]
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(players), func(i, j int) { players[i], players[j] = players[j], players[i] })
-	return players[:n]
+	return players
 }
 
 func callSorareApi[K interface{}](req *graphql.Request) (K, error) {
