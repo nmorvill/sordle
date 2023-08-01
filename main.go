@@ -31,6 +31,10 @@ func main() {
 
 	r.LoadHTMLGlob("./*.html")
 	r.GET("/", func(c *gin.Context) {
+		newDate := (int(time.Now().Sub(randomDate).Hours()) / 24) % len(p)
+		if newDate != index {
+			index = newDate
+		}
 		c.HTML(http.StatusOK, "index.html", nil)
 	})
 	r.GET("/player", func(c *gin.Context) {
