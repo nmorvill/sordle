@@ -29,7 +29,7 @@ func main() {
 	r := gin.Default()
 	r.Use(cors.Default())
 
-	r.LoadHTMLGlob("./*")
+	r.LoadHTMLGlob("./*.html")
 	r.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", nil)
 	})
