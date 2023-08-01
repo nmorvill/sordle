@@ -20,7 +20,6 @@ import (
 )
 
 func main() {
-	dump("players", getNMostSubscribedPlayers(1500))
 	p, _ := pick[[]playersub]("players")
 	loc, _ := time.LoadLocation("Europe/Paris")
 	randomDate := time.Date(2023, time.May, 0, 0, 0, 0, 0, loc)
