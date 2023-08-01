@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"sort"
@@ -21,9 +22,9 @@ import (
 func main() {
 	dump("players", getNMostSubscribedPlayers(1500))
 	p, _ := pick[[]playersub]("players")
-	randomDate := time.Date(2023, time.May, 0, 0, 0, 0, 0, time.Local)
-	index := (int(time.Now().Sub(randomDate).Hours()) / 24) % len(p)
-	fmt.Println(p[index])
+	loc, _ := time.LoadLocation("Europe/Paris")
+	randomDate := time.Date(2023, time.May, 0, 0, 0, 0, 0, loc)
+	index := (int(time.Now().In(loc).Sub(randomDate).Hours()) / 24) % len(p)
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
@@ -31,7 +32,8 @@ func main() {
 
 	r.LoadHTMLGlob("./*.html")
 	r.GET("/", func(c *gin.Context) {
-		newDate := (int(time.Now().Sub(randomDate).Hours()) / 24) % len(p)
+
+		newDate := (int(time.Now().In(loc).Sub(randomDate).Hours()) / 24) % len(p)
 		if newDate != index {
 			index = newDate
 		}
@@ -368,6 +370,8 @@ func getNMostSubscribedPlayers(n int) []playersub {
 	sort.Slice(players, func(i, j int) bool {
 		return players[i].Subscriptions > players[j].Subscriptions
 	})
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(players), func(i, j int) { players[i], players[j] = players[j], players[i] })
 	return players[:n]
 }
 
