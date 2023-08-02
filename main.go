@@ -895,6 +895,9 @@ func getContinent(code string) Continent {
 	case "AE":
 		return Asia
 	case "GB":
+	case "GB-EN":
+	case "GB-WLS":
+	case "GB-SCT":
 		return Europe
 	case "US":
 		return Americas
