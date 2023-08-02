@@ -19,22 +19,24 @@ import (
 	"github.com/machinebox/graphql"
 )
 
+var numberOfFound = 0
+
 func main() {
 	p, _ := pick[[]playersub]("players")
 	loc, _ := time.LoadLocation("Europe/Paris")
 	randomDate := time.Date(2023, time.May, 0, 0, 0, 0, 0, loc)
 	index := (int(time.Now().In(loc).Sub(randomDate).Hours()) / 24) % len(p)
 
-	gin.SetMode(gin.ReleaseMode)
+	//gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(cors.Default())
 
 	r.LoadHTMLGlob("./*.html")
 	r.GET("/", func(c *gin.Context) {
-
 		newDate := (int(time.Now().In(loc).Sub(randomDate).Hours()) / 24) % len(p)
 		if newDate != index {
 			index = newDate
+			numberOfFound = 0
 		}
 		c.HTML(http.StatusOK, "index.html", nil)
 	})
@@ -49,6 +51,11 @@ func main() {
 		for _, player := range p {
 			res.WriteString(fmt.Sprintf(`<option value="%s">%s</option>`, player.Slug, player.DisplayName))
 		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", res.Bytes())
+	})
+	r.GET("/nb-players", func(c *gin.Context) {
+		var res bytes.Buffer
+		res.WriteString(fmt.Sprintf("<h2>Today %d people found !</h2>", numberOfFound))
 		c.Data(http.StatusOK, "text/html; charset=utf-8", res.Bytes())
 	})
 	r.Run()
@@ -272,6 +279,7 @@ func comparePlayerInformations(slug1, slug2 string, trys int) (bytes.Buffer, boo
 				<h2>Good Job ! You found <span>%s</span> in %d trys !
 			</div>
 		`, p2.Name, trys))
+		numberOfFound++
 	}
 	return ret, winner
 }

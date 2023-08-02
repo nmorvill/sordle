@@ -26,6 +26,14 @@
             font-size: 4em;
         }
 
+        h2 {
+            color: white;
+        }
+
+        #results {
+            overflow-x: auto;
+        }
+
         .row,
         .titles {
             width: 672px;
@@ -35,7 +43,8 @@
             align-items: center;
             justify-items: center;
             margin-top: 25px;
-            color: white
+            color: white;
+            overflow-x: auto;
         }
 
         .row>div {
@@ -132,25 +141,27 @@
 <body>
     <div id="main">
         <h1>SORDLE</h1>
+        <div hx-get="/nb-players" hx-swap="innerHTML" hx-trigger="load"></div>
         <form hx-get="/player" hx-target="#results" hx-swap="beforeend" id="form">
-            <input type="text" name="player" list="players" id="players-input">
+            <input type="text" name="player" list="players" id="players-input" autocomplete="off">
             <input type="hidden" id="nb-trys" name="trys">
             <button id="submit">Submit</button>
         </form>
-        <div class="titles">
-            <div>Player</div>
-            <div>Age</div>
-            <div>Club</div>
-            <div>Country</div>
-            <div>Shirt Number</div>
-            <div>Position</div>
-            <div>L5</div>
-            <div>L15</div>
+        <div id="results">
+            <div class="titles">
+                <div>Player</div>
+                <div>Age</div>
+                <div>Club</div>
+                <div>Country</div>
+                <div>Shirt Number</div>
+                <div>Position</div>
+                <div>L5</div>
+                <div>L15</div>
+            </div>
         </div>
-        <div id="results"></div>
         <div id="tweet"></div>
     </div>
-    <datalist id="players" hx-get="/all-players" hx-trigger="load">
+    <datalist hx-get="/all-players" hx-trigger="load">
 
     </datalist>
 </body>
@@ -158,9 +169,19 @@
 </html>
 
 <script>
-    let nbTrys = 0
+    let nbTrys = -1
     let nbErrors = 0
     let text = ""
+
+    const datalist = document.querySelector("datalist")
+
+    document.getElementById("players-input").addEventListener("keyup", (e) => {
+        if (e.target.value.length >= 4) {
+            datalist.setAttribute("id", "players")
+        } else {
+            datalist.setAttribute("id", "");
+        }
+    })
 
     document.body.addEventListener('htmx:afterSwap', function (evt) {
         const form = document.querySelector("#form");
@@ -168,6 +189,7 @@
         nbTrys++
         nbErrors = document.querySelectorAll("#error").length
         document.getElementById("nb-trys").value = nbTrys - nbErrors
+        datalist.setAttribute("id", "");
 
         var winner = document.getElementById("winner")
         if (winner != null) {
@@ -178,12 +200,21 @@
                 result += getResult(row.childNodes) + "<br>"
             }
             const tweetContainer = document.getElementById("tweet")
-            text = "I found today's #Sordle in " + (nbTrys - nbErrors - 1) + " trys !" + result;
+            text = "I found today's #Sordle in " + (nbTrys - nbErrors - 1) + " trys !" + result + "<br> sordle.net<br>";
             const copyButton = `<button onclick='copyToClipboard()'>Copy to clipboard</button>`
-            tweetContainer.innerHTML = text + copyButton
+            const tweetButton = `<button onclick='openTwitter()'>Share on Twitter !</button>`
+            tweetContainer.innerHTML = text + copyButton + tweetButton
             tweetContainer.style.display = "block"
         }
     });
+
+    function openTwitter() {
+        const twitterQuery = text.replaceAll("<br>", "\n")
+        var link = encodeURI(`https:\/\/twitter.com\/intent\/tweet?text=${twitterQuery}`)
+        link = link.replaceAll("#", "%23")
+        console.log(link)
+        window.open(link)
+    }
 
     function copyToClipboard() {
         const tempText = text.replaceAll("<br>", "\n")
