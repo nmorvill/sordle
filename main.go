@@ -20,7 +20,7 @@ import (
 	"github.com/machinebox/graphql"
 )
 
-var numberOfFound = 0
+var numberOfFound = 95
 
 func main() {
 	p, _ := pick[[]playersub]("players")
