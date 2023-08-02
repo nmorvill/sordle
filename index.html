@@ -10,13 +10,13 @@
     <style>
         body {
             background-color: #363636;
+            font-family: 'Inter', sans-serif;
         }
 
         #main {
             margin-top: 50px;
             width: 100%;
             text-align: center;
-            font-family: 'Inter', sans-serif;
         }
 
         h1 {
@@ -135,12 +135,61 @@
             border: 1px solid white;
             margin-right: 25px;
         }
+
+        dialog {
+            background-color: #363636
+        }
+
+        ol {
+            text-align: left;
+            list-style: none;
+            counter-reset: item;
+        }
+
+        li {
+            counter-increment: item;
+            margin-bottom: 25px;
+            color: white;
+        }
+
+        li:before {
+            margin-right: 10px;
+            content: counter(item);
+            background: #319F0B;
+            border-radius: 100%;
+            color: white;
+            width: 1.2em;
+            text-align: center;
+            display: inline-block;
+        }
+
+        footer {
+            position: fixed;
+            color: #DCDCDC;
+            bottom: 25px;
+            right: 25px;
+            opacity: 75%;
+        }
+
+        footer a {
+            text-decoration: none;
+            color: white;
+        }
     </style>
 </head>
 
 <body>
     <div id="main">
         <h1>SORDLE</h1>
+        <dialog id="d">
+            <h2>RULES</h2>
+            <ol type="1">
+                <li>Type a player name</li>
+                <li>Pick the player name in the suggested list</li>
+                <li>Start again until you find the player !</li>
+            </ol>
+            <button onclick="d.close()">Understood !</button>
+        </dialog>
         <div hx-get="/nb-players" hx-swap="innerHTML" hx-trigger="load"></div>
         <form hx-get="/player" hx-target="#results" hx-swap="beforeend" id="form">
             <input type="text" name="player" list="players" id="players-input" autocomplete="off">
@@ -164,6 +213,9 @@
     <datalist hx-get="/all-players" hx-trigger="load">
 
     </datalist>
+    <footer>
+        Made by <a href="https://twitter.com/noemorvillers">@noemorvillers</a>
+    </footer>
 </body>
 
 </html>
@@ -174,6 +226,7 @@
     let text = ""
 
     const datalist = document.querySelector("datalist")
+    d.showModal()
 
     document.getElementById("players-input").addEventListener("keyup", (e) => {
         if (e.target.value.length >= 4) {

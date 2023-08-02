@@ -11,6 +11,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,7 +28,7 @@ func main() {
 	randomDate := time.Date(2023, time.May, 0, 0, 0, 0, 0, loc)
 	index := (int(time.Now().In(loc).Sub(randomDate).Hours()) / 24) % len(p)
 
-	//gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(cors.Default())
 
@@ -120,23 +121,25 @@ type playerInfos struct {
 			} `json:"activeClub"`
 			Country struct {
 				FlagUrl string `json:"flagUrl"`
+				Code    string `json:"code"`
 			} `json:"country"`
 		} `json:"player"`
 	} `json:"football"`
 }
 
 type playerinf struct {
-	Age          int
-	Position     string
-	ShirtNumber  int
-	Club         string
-	ClubLeague   string
-	NationalTeam string
-	Slug         string
-	L5           int
-	L15          int
-	PicUrl       string
-	Name         string
+	Age              int
+	Position         string
+	ShirtNumber      int
+	Club             string
+	ClubLeague       string
+	NationalTeam     string
+	Slug             string
+	L5               int
+	L15              int
+	PicUrl           string
+	Name             string
+	NationalTeamCode string
 }
 
 type color string
@@ -168,6 +171,17 @@ func getShortPosition(pos string) string {
 	}
 	return "ERR"
 }
+
+type Continent int
+
+const (
+	Asia Continent = iota
+	Europe
+	Africa
+	Oceania
+	Americas
+	Other
+)
 
 func dump(filename string, data any) {
 	var buf bytes.Buffer
@@ -213,64 +227,54 @@ func comparePlayerInformations(slug1, slug2 string, trys int) (bytes.Buffer, boo
 		return ret, false
 	}
 	ret.WriteString(`<div class="row">`)
-	winner := true
+	winner := slug1 == slug2
 	ret.WriteString(`<div><img src="` + p2.PicUrl + `" title="` + p2.Name + `"/></div>`)
 	if p1.Age == p2.Age {
 		ret.Write(buildTextDiv(GREEN, strconv.Itoa(p2.Age), NONE))
 	} else if p1.Age > p2.Age {
 		ret.Write(buildTextDiv(RED, strconv.Itoa(p2.Age), OVER))
-		winner = false
 	} else if p1.Age < p2.Age {
 		ret.Write(buildTextDiv(RED, strconv.Itoa(p2.Age), UNDER))
-		winner = false
 	}
 	if p1.Club == p2.Club {
 		ret.Write(buildTextDiv(GREEN, `<img src="`+p2.Club+`"/>`, NONE))
 	} else if p1.ClubLeague == p2.ClubLeague {
 		ret.Write(buildTextDiv(YELLOW, `<img src="`+p2.Club+`"/>`, NONE))
-		winner = false
 	} else {
 		ret.Write(buildTextDiv(RED, `<img src="`+p2.Club+`"/>`, NONE))
-		winner = false
 	}
 	if p1.NationalTeam == p2.NationalTeam {
 		ret.Write(buildTextDiv(GREEN, `<img src="`+p2.NationalTeam+`"/>`, NONE))
+	} else if getContinent(p1.NationalTeamCode) == getContinent(p2.NationalTeamCode) {
+		ret.Write(buildTextDiv(YELLOW, `<img src="`+p2.NationalTeam+`"/>`, NONE))
 	} else {
 		ret.Write(buildTextDiv(RED, `<img src="`+p2.NationalTeam+`"/>`, NONE))
-		winner = false
 	}
 	if p1.ShirtNumber == p2.ShirtNumber {
 		ret.Write(buildTextDiv(GREEN, strconv.Itoa(p2.ShirtNumber), NONE))
 	} else if p1.ShirtNumber > p2.ShirtNumber {
 		ret.Write(buildTextDiv(RED, strconv.Itoa(p2.ShirtNumber), OVER))
-		winner = false
 	} else if p1.ShirtNumber < p2.ShirtNumber {
 		ret.Write(buildTextDiv(RED, strconv.Itoa(p2.ShirtNumber), UNDER))
-		winner = false
 	}
 	if p1.Position == p2.Position {
 		ret.Write(buildTextDiv(GREEN, p2.Position, NONE))
 	} else {
 		ret.Write(buildTextDiv(RED, p2.Position, NONE))
-		winner = false
 	}
 	if p1.L5 == p2.L5 {
 		ret.Write(buildTextDiv(GREEN, strconv.Itoa(p2.L5), NONE))
 	} else if p1.L5 > p2.L5 {
 		ret.Write(buildTextDiv(RED, strconv.Itoa(p2.L5), OVER))
-		winner = false
 	} else if p1.L5 < p2.L5 {
 		ret.Write(buildTextDiv(RED, strconv.Itoa(p2.L5), UNDER))
-		winner = false
 	}
 	if p1.L15 == p2.L15 {
 		ret.Write(buildTextDiv(GREEN, strconv.Itoa(p2.L15), NONE))
 	} else if p1.L15 > p2.L15 {
 		ret.Write(buildTextDiv(RED, strconv.Itoa(p2.L15), OVER))
-		winner = false
 	} else if p1.L15 < p2.L15 {
 		ret.Write(buildTextDiv(RED, strconv.Itoa(p2.L15), UNDER))
-		winner = false
 	}
 	ret.WriteString("</div>")
 	if winner {
@@ -322,6 +326,7 @@ func getPlayerInformations(slug string, res chan playerinf) {
 				}
 				country {
 					flagUrl
+					code
 				}
 			}
 		}
@@ -342,6 +347,7 @@ func getPlayerInformations(slug string, res chan playerinf) {
 		ret.L15 = int(player.Football.Player.L15)
 		ret.Name = player.Football.Player.DisplayName
 		ret.PicUrl = player.Football.Player.PictureUrl
+		ret.NationalTeamCode = strings.ToUpper(player.Football.Player.Country.Code)
 	}
 	res <- ret
 }
@@ -462,4 +468,462 @@ func getPlayersFromClub(slug string) []playersub {
 		ret = append(ret, playersub{Slug: p.Slug, Subscriptions: p.Subscriptions, DisplayName: p.DisplayName})
 	}
 	return ret
+}
+
+func getContinent(code string) Continent {
+	switch code {
+	case "AF":
+		return Asia
+	case "AL":
+		return Europe
+	case "DZ":
+		return Africa
+	case "AS":
+		return Oceania
+	case "AD":
+		return Europe
+	case "AO":
+		return Africa
+	case "AI":
+		return Americas
+	case "AG":
+		return Americas
+	case "AR":
+		return Americas
+	case "AM":
+		return Asia
+	case "AW":
+		return Americas
+	case "AU":
+		return Oceania
+	case "AT":
+		return Europe
+	case "AZ":
+		return Asia
+	case "BS":
+		return Americas
+	case "BH":
+		return Asia
+	case "BD":
+		return Asia
+	case "BB":
+		return Americas
+	case "BY":
+		return Europe
+	case "BE":
+		return Europe
+	case "BZ":
+		return Americas
+	case "BJ":
+		return Africa
+	case "BM":
+		return Americas
+	case "BT":
+		return Asia
+	case "BO":
+		return Americas
+	case "BA":
+		return Europe
+	case "BW":
+		return Africa
+	case "BR":
+		return Americas
+	case "VG":
+		return Americas
+	case "BN":
+		return Asia
+	case "BG":
+		return Europe
+	case "BF":
+		return Africa
+	case "BI":
+		return Africa
+	case "KH":
+		return Asia
+	case "CM":
+		return Africa
+	case "CA":
+		return Americas
+	case "CV":
+		return Africa
+	case "KY":
+		return Americas
+	case "CF":
+		return Africa
+	case "TD":
+		return Africa
+	case "CL":
+		return Americas
+	case "CN":
+		return Asia
+	case "CX":
+		return Asia
+	case "CC":
+		return Asia
+	case "CO":
+		return Americas
+	case "KM":
+		return Africa
+	case "CG":
+		return Africa
+	case "CK":
+		return Oceania
+	case "CR":
+		return Americas
+	case "CI":
+		return Africa
+	case "HR":
+		return Europe
+	case "CU":
+		return Americas
+	case "CY":
+		return Asia
+	case "CZ":
+		return Europe
+	case "DK":
+		return Europe
+	case "DJ":
+		return Africa
+	case "DM":
+		return Americas
+	case "DO":
+		return Americas
+	case "EC":
+		return Americas
+	case "EG":
+		return Africa
+	case "SV":
+		return Americas
+	case "GQ":
+		return Africa
+	case "ER":
+		return Africa
+	case "EE":
+		return Europe
+	case "ET":
+		return Africa
+	case "FK":
+		return Americas
+	case "FO":
+		return Europe
+	case "FJ":
+		return Oceania
+	case "FI":
+		return Europe
+	case "FR":
+		return Europe
+	case "GF":
+		return Americas
+	case "PF":
+		return Oceania
+	case "GA":
+		return Africa
+	case "GM":
+		return Africa
+	case "GE":
+		return Asia
+	case "DE":
+		return Europe
+	case "GH":
+		return Africa
+	case "GI":
+		return Europe
+	case "GR":
+		return Europe
+	case "GL":
+		return Americas
+	case "GD":
+		return Americas
+	case "GP":
+		return Americas
+	case "GU":
+		return Oceania
+	case "GT":
+		return Americas
+	case "GN":
+		return Africa
+	case "GW":
+		return Africa
+	case "GY":
+		return Americas
+	case "HT":
+		return Americas
+	case "VA":
+		return Europe
+	case "HN":
+		return Americas
+	case "HU":
+		return Europe
+	case "IS":
+		return Europe
+	case "IN":
+		return Asia
+	case "ID":
+		return Asia
+	case "IR":
+		return Asia
+	case "IQ":
+		return Asia
+	case "IE":
+		return Europe
+	case "IL":
+		return Asia
+	case "IT":
+		return Europe
+	case "JM":
+		return Americas
+	case "JP":
+		return Asia
+	case "JO":
+		return Asia
+	case "KZ":
+		return Asia
+	case "KE":
+		return Africa
+	case "KI":
+		return Oceania
+	case "KP":
+		return Asia
+	case "KR":
+		return Asia
+	case "KW":
+		return Asia
+	case "KG":
+		return Asia
+	case "LA":
+		return Asia
+	case "LV":
+		return Europe
+	case "LB":
+		return Asia
+	case "LS":
+		return Africa
+	case "LR":
+		return Africa
+	case "LY":
+		return Africa
+	case "LI":
+		return Europe
+	case "LT":
+		return Europe
+	case "LU":
+		return Europe
+	case "MK":
+		return Europe
+	case "MG":
+		return Africa
+	case "MW":
+		return Africa
+	case "MY":
+		return Asia
+	case "MV":
+		return Asia
+	case "ML":
+		return Africa
+	case "MT":
+		return Europe
+	case "MH":
+		return Oceania
+	case "MQ":
+		return Americas
+	case "MR":
+		return Africa
+	case "MU":
+		return Africa
+	case "YT":
+		return Africa
+	case "MX":
+		return Americas
+	case "FM":
+		return Oceania
+	case "MD":
+		return Europe
+	case "MC":
+		return Europe
+	case "MN":
+		return Asia
+	case "MS":
+		return Americas
+	case "MA":
+		return Africa
+	case "MZ":
+		return Africa
+	case "NA":
+		return Africa
+	case "NR":
+		return Oceania
+	case "NP":
+		return Asia
+	case "NL":
+		return Europe
+	case "AN":
+		return Americas
+	case "NC":
+		return Oceania
+	case "NZ":
+		return Oceania
+	case "NI":
+		return Americas
+	case "NE":
+		return Africa
+	case "NG":
+		return Africa
+	case "NU":
+		return Oceania
+	case "NF":
+		return Oceania
+	case "MP":
+		return Oceania
+	case "NO":
+		return Europe
+	case "OM":
+		return Asia
+	case "PK":
+		return Asia
+	case "PW":
+		return Oceania
+	case "--":
+		return Asia
+	case "PA":
+		return Americas
+	case "PG":
+		return Oceania
+	case "PY":
+		return Americas
+	case "PE":
+		return Americas
+	case "PH":
+		return Asia
+	case "PN":
+		return Oceania
+	case "PL":
+		return Europe
+	case "PT":
+		return Europe
+	case "PR":
+		return Americas
+	case "QA":
+		return Asia
+	case "RE":
+		return Africa
+	case "RO":
+		return Europe
+	case "RU":
+		return Asia
+	case "RW":
+		return Africa
+	case "KN":
+		return Americas
+	case "LC":
+		return Americas
+	case "PM":
+		return Americas
+	case "VC":
+		return Americas
+	case "SM":
+		return Europe
+	case "ST":
+		return Africa
+	case "SA":
+		return Asia
+	case "SN":
+		return Africa
+	case "SC":
+		return Africa
+	case "SL":
+		return Africa
+	case "SG":
+		return Asia
+	case "SK":
+		return Europe
+	case "SI":
+		return Europe
+	case "SB":
+		return Oceania
+	case "SO":
+		return Africa
+	case "ZA":
+		return Africa
+	case "ES":
+		return Europe
+	case "LK":
+		return Asia
+	case "SD":
+		return Africa
+	case "SR":
+		return Americas
+	case "SJ":
+		return Europe
+	case "SZ":
+		return Africa
+	case "SE":
+		return Europe
+	case "CH":
+		return Europe
+	case "SY":
+		return Asia
+	case "TW":
+		return Asia
+	case "TJ":
+		return Asia
+	case "TZ":
+		return Africa
+	case "TH":
+		return Asia
+	case "TG":
+		return Africa
+	case "TK":
+		return Oceania
+	case "TO":
+		return Oceania
+	case "TT":
+		return Americas
+	case "TN":
+		return Africa
+	case "TR":
+		return Asia
+	case "TM":
+		return Asia
+	case "TC":
+		return Americas
+	case "TV":
+		return Oceania
+	case "UG":
+		return Africa
+	case "UA":
+		return Europe
+	case "AE":
+		return Asia
+	case "GB":
+		return Europe
+	case "US":
+		return Americas
+	case "UY":
+		return Americas
+	case "UZ":
+		return Asia
+	case "VU":
+		return Oceania
+	case "VE":
+		return Americas
+	case "VN":
+		return Asia
+	case "VI":
+		return Americas
+	case "WF":
+		return Oceania
+	case "EH":
+		return Africa
+	case "WS":
+		return Oceania
+	case "YE":
+		return Asia
+	case "ZR":
+		return Africa
+	case "ZM":
+		return Africa
+	case "ZW":
+		return Africa
+	}
+	return Other
 }
