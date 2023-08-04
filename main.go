@@ -479,6 +479,9 @@ func getPlayersFromClub(slug string) []playersub {
 	return ret
 }
 
+/*
+GENERATED CODE
+*/
 func getContinent(code string) Continent {
 	switch code {
 	case "AF":
