@@ -34,10 +34,11 @@ func main() {
 
 	r.LoadHTMLGlob("./*.html")
 	r.GET("/", func(c *gin.Context) {
-		newDate := (int(time.Now().In(loc).Sub(randomDate).Hours()) / 24) % len(p)
-		if newDate != index {
-			index = newDate
+		newIndex := (int(time.Now().In(loc).Sub(randomDate).Hours()) / 24) % len(p)
+		if newIndex != index {
+			index = newIndex
 			numberOfFound = 0
+			fmt.Println(p[index])
 		}
 		c.HTML(http.StatusOK, "index.html", nil)
 	})
@@ -79,6 +80,9 @@ type club struct {
 					Slug          string `json:"slug"`
 					Subscriptions int    `json:"subscriptionsCount"`
 					DisplayName   string `json:"displayName"`
+					CardSupply    []struct {
+						Limited int `json:"limited"`
+					} `json:"cardSupply"`
 				} `json:"nodes"`
 			} `json:"activePlayers"`
 		} `json:"club"`
@@ -455,6 +459,9 @@ func getPlayersFromClub(slug string) []playersub {
 						slug
 						subscriptionsCount
 						displayName
+						cardSupply {
+							limited
+						}
 					}
 				}
 			}
@@ -465,7 +472,9 @@ func getPlayersFromClub(slug string) []playersub {
 	res, _ := callSorareApi[club](q)
 	var ret []playersub
 	for _, p := range res.Football.Club.ActivePlayers.Nodes {
-		ret = append(ret, playersub{Slug: p.Slug, Subscriptions: p.Subscriptions, DisplayName: p.DisplayName})
+		if len(p.CardSupply) > 0 {
+			ret = append(ret, playersub{Slug: p.Slug, Subscriptions: p.Subscriptions, DisplayName: p.DisplayName})
+		}
 	}
 	return ret
 }
@@ -895,9 +904,14 @@ func getContinent(code string) Continent {
 	case "AE":
 		return Asia
 	case "GB":
-	case "GB-EN":
+		return Europe
+	case "GB-ENG":
+		return Europe
 	case "GB-WLS":
+		return Europe
 	case "GB-SCT":
+		return Europe
+	case "GB-NIR":
 		return Europe
 	case "US":
 		return Americas
