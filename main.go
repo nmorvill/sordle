@@ -31,7 +31,7 @@ func main() {
 	allClubs := getAllClubs()
 	fmt.Println(todayGame)
 
-	//gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(cors.Default())
 
@@ -336,9 +336,9 @@ func testClub(slug1 string, trys int, today formation) (bytes.Buffer, bool) {
 		ret.WriteString(`<div class="row">`)
 		for _, player := range line {
 			if i >= trys && !winner {
-				ret.WriteString(`<div class="player"><img src="` + player.countryUrl + `" class="hidden"><div class="score">` + fmt.Sprintf("%v", player.score) + `</div></div>`)
+				ret.WriteString(`<div class="player"><img src="` + player.countryUrl + `" class="hidden"><div class="score" style="background-color:` + getColorOfNote(player.score) + `">` + fmt.Sprintf("%v", player.score) + `</div></div>`)
 			} else {
-				ret.WriteString(`<div class="player"><img src="` + player.countryUrl + `"><div class="score">` + fmt.Sprintf("%v", player.score) + `</div></div>`)
+				ret.WriteString(`<div class="player"><img src="` + player.countryUrl + `"><div class="score" style="background-color:` + getColorOfNote(player.score) + `">` + fmt.Sprintf("%v", player.score) + `</div></div>`)
 			}
 			i++
 		}
@@ -430,6 +430,23 @@ func comparePlayerInformations(slug1, slug2 string, trys int) (bytes.Buffer, boo
 		numberOfFound++
 	}
 	return ret, winner
+}
+
+func getColorOfNote(note float32) string {
+	if note >= 70 {
+		return "#34732F"
+	} else if note >= 60 {
+		return "#5EA258"
+	} else if note >= 50 {
+		return "#8EBC8A"
+	} else if note >= 40 {
+		return "#F1AF4B"
+	} else if note >= 30 {
+		return "#CD6D15"
+	} else if note >= 20 {
+		return "#CD4115"
+	}
+	return "#CD4115"
 }
 
 func buildTextDiv(c color, content string, a arrow) []byte {
