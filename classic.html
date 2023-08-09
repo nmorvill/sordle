@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sordle</title>
+    <script src="https://unpkg.com/htmx.org@1.9.4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #363636;
+            font-family: 'Inter', sans-serif;
+        }
+
+        #main {
+            margin-top: 50px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            font-weight: 800;
+            letter-spacing: 0.25em;
+            color: #DCDCDC;
+            font-size: 4em;
+        }
+
+        h2 {
+            color: white;
+        }
+
+        #results {
+            overflow-x: auto;
+        }
+
+        .row,
+        .titles {
+            width: 672px;
+            margin: auto;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            align-items: center;
+            justify-items: center;
+            margin-top: 25px;
+            color: white;
+            overflow-x: auto;
+        }
+
+        .row>div {
+            width: 64px;
+            height: 64px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 700;
+            border: 1px solid white;
+            font-size: 16px;
+        }
+
+        .titles>div {
+            border-bottom: 1px solid white;
+            width: 64px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        img {
+            max-width: 48px;
+            max-height: 48px;
+        }
+
+        button {
+            background-color: #319F0B;
+            border: none;
+            padding: 5px 15px;
+            color: #DCDCDC;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            border-radius: 15px;
+            margin-left: 15px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #363636;
+        }
+
+        .error {
+            margin-top: 15px;
+            color: red;
+        }
+
+        .winner,
+        #tweet {
+            width: 672px;
+            margin-top: 50px;
+            border-radius: 10px;
+            color: white;
+            margin-right: auto;
+            margin-left: auto;
+
+        }
+
+        .winner {
+            background-color: #3CB043;
+            border: 1px solid #319F0B;
+        }
+
+        .red {
+            background-color: #C51605;
+        }
+
+        .yellow {
+            background-color: #FD8D14;
+        }
+
+        .green {
+            background-color: #3CB043;
+        }
+
+        #tweet {
+            display: none;
+            background-color: #3c72b0;
+            border: 1px solid #233f5f;
+            color: white;
+            padding: 25px 25px;
+        }
+
+        #tweet button {
+            margin-top: 25px;
+            background-color: transparent;
+            border: 1px solid white;
+            margin-right: 25px;
+        }
+
+
+        dialog {
+            background-color: #363636
+        }
+
+        ol {
+            text-align: left;
+            list-style: none;
+            counter-reset: item;
+        }
+
+        li {
+            counter-increment: item;
+            margin-bottom: 25px;
+            color: white;
+        }
+
+        li:before {
+            margin-right: 10px;
+            content: counter(item);
+            background: #319F0B;
+            border-radius: 100%;
+            color: white;
+            width: 1.2em;
+            text-align: center;
+            display: inline-block;
+        }
+
+        li a {
+            color: white;
+        }
+
+        footer {
+            position: fixed;
+            color: #DCDCDC;
+            bottom: 25px;
+            right: 25px;
+            opacity: 75%;
+        }
+
+        footer a {
+            text-decoration: none;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="main">
+        <h1>SORDLE</h1>
+        <dialog id="d">
+            <h2>RULES</h2>
+            <ol type="1">
+                <li>Type a player name</li>
+                <li>Pick the player name in the suggested list</li>
+                <li>Start again until you find the player !</li>
+                </li>
+            </ol>
+            <button onclick="d.close()">Understood !</button>
+        </dialog>
+        <div hx-get="/nb-players" hx-swap="innerHTML" hx-trigger="load"></div>
+        <form hx-get="/player" hx-target="#results" hx-swap="beforeend" id="form">
+            <input type="text" name="player" list="players" id="players-input" autocomplete="off">
+            <input type="hidden" id="nb-trys" name="trys">
+            <button id="submit">Submit</button>
+        </form>
+        <div id="results">
+            <div class="titles">
+                <div>Player</div>
+                <div>Age</div>
+                <div>Club</div>
+                <div>Country</div>
+                <div>Shirt Number</div>
+                <div>Position</div>
+                <div>L5</div>
+                <div>L15</div>
+            </div>
+        </div>
+        <div id="tweet"></div>
+    </div>
+    <datalist hx-get="/all-players" hx-trigger="load">
+
+    </datalist>
+    <footer>
+        Made by <a href="https://twitter.com/noemorvillers">@noemorvillers</a> (I'm looking for a job btw)
+    </footer>
+</body>
+
+</html>
+
+<script>
+    let nbTrys = -1
+    let nbErrors = 0
+    let text = ""
+
+    const datalist = document.querySelector("datalist")
+    d.showModal()
+
+    document.getElementById("players-input").addEventListener("keyup", (e) => {
+        if (e.target.value.length >= 4) {
+            datalist.setAttribute("id", "players")
+        } else {
+            datalist.setAttribute("id", "");
+        }
+    })
+
+    document.body.addEventListener('htmx:afterSwap', function (evt) {
+        const form = document.querySelector("#form");
+        form.reset();
+        nbTrys++
+        nbErrors = document.querySelectorAll("#error").length
+        document.getElementById("nb-trys").value = nbTrys - nbErrors
+        datalist.setAttribute("id", "");
+
+        var winner = document.getElementById("winner")
+        if (winner != null) {
+            document.getElementById("submit").disabled = true
+            var rows = document.querySelectorAll(".row")
+            var result = "<br>"
+            for (const row of rows) {
+                result += getResult(row.childNodes) + "<br>"
+            }
+            const tweetContainer = document.getElementById("tweet")
+            text = "I found today's #Sordle in " + (nbTrys - nbErrors - 1) + " trys !" + result + "<br> sordle.net<br>";
+            const copyButton = `<button onclick='copyToClipboard()'>Copy to clipboard</button>`
+            const tweetButton = `<button onclick='openTwitter()'>Share on Twitter !</button>`
+            tweetContainer.innerHTML = text + copyButton + tweetButton
+            tweetContainer.style.display = "block"
+        }
+    });
+
+    function openTwitter() {
+        const twitterQuery = text.replaceAll("<br>", "\n")
+        var link = encodeURI(`https:\/\/twitter.com\/intent\/tweet?text=${twitterQuery}`)
+        link = link.replaceAll("#", "%23")
+        console.log(link)
+        window.open(link)
+    }
+
+    function copyToClipboard() {
+        const tempText = text.replaceAll("<br>", "\n")
+        navigator.clipboard.writeText(tempText);
+    }
+
+    function getResult(nodes) {
+        const emojis = ["🟩", "🟥", "🟧"]
+        let res = ""
+        for (const node of nodes) {
+            if (node.className === "green") {
+                res += emojis[0]
+            } else if (node.className === "red") {
+                res += emojis[1]
+            } else if (node.className === "yellow") {
+                res += emojis[2]
+            }
+        }
+        return res
+    }
+</script>

@@ -27,20 +27,29 @@ func main() {
 	loc, _ := time.LoadLocation("Europe/Paris")
 	randomDate := time.Date(2023, time.May, 0, 0, 0, 0, 0, loc)
 	index := (int(time.Now().In(loc).Sub(randomDate).Hours()) / 24) % len(p)
+	todayGame := getRandomGameFromLastGameweek()
+	allClubs := getAllClubs()
+	fmt.Println(todayGame)
 
-	gin.SetMode(gin.ReleaseMode)
+	//gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(cors.Default())
 
+	r.Static("/assets", "./assets/")
 	r.LoadHTMLGlob("./*.html")
 	r.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.html", nil)
+	})
+
+	r.GET("/classic", func(c *gin.Context) {
 		newIndex := (int(time.Now().In(loc).Sub(randomDate).Hours()) / 24) % len(p)
 		if newIndex != index {
 			index = newIndex
 			numberOfFound = 0
 			fmt.Println(p[index])
+			todayGame = getRandomGameFromLastGameweek()
 		}
-		c.HTML(http.StatusOK, "index.html", nil)
+		c.HTML(http.StatusOK, "classic.html", nil)
 	})
 	r.GET("/player", func(c *gin.Context) {
 		player := c.DefaultQuery("player", "")
@@ -60,7 +69,30 @@ func main() {
 		res.WriteString(fmt.Sprintf("<h2>Today %d people found !</h2>", numberOfFound))
 		c.Data(http.StatusOK, "text/html; charset=utf-8", res.Bytes())
 	})
+	r.GET("/comp", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "comp.html", nil)
+	})
+	r.GET("/compare-clubs", func(c *gin.Context) {
+		club := c.DefaultQuery("club", "")
+		trys, _ := strconv.Atoi(c.DefaultQuery("trys", "0"))
+		res, _ := testClub(club, trys-1, todayGame)
+		c.Data(http.StatusOK, "text/html; charset=utf-8", res.Bytes())
+	})
+	r.GET("/all-clubs", func(c *gin.Context) {
+		var res bytes.Buffer
+		for _, c := range allClubs {
+			res.WriteString(fmt.Sprintf(`<option value="%s">%s</option>`, c.Slug, c.Name))
+		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", res.Bytes())
+	})
 	r.Run()
+}
+
+func getRandomGameFromLastGameweek() formation {
+	rand.Seed(time.Now().UnixNano())
+	gamesId := getGamesFromGameweek(getLastGameWeek())
+	gameId := gamesId[rand.Intn(len(gamesId))]
+	return getGameInfos(gameId, rand.Intn(2) == 1)
 }
 
 type league struct {
@@ -95,6 +127,7 @@ type competition struct {
 			Clubs struct {
 				Nodes []struct {
 					Slug string `json:"slug"`
+					Name string `json:"name"`
 				} `json:"nodes"`
 			} `json:"clubs"`
 		} `json:"competition"`
@@ -131,6 +164,35 @@ type playerInfos struct {
 	} `json:"football"`
 }
 
+type featured struct {
+	Football struct {
+		So5 struct {
+			FeaturedSo5Fixtures []struct {
+				Slug string
+			} `json:"featuredSo5Fixtures"`
+		} `json:"so5"`
+	} `json:"football"`
+}
+
+type games struct {
+	Football struct {
+		So5 struct {
+			So5Fixture struct {
+				Games []struct {
+					Id             string `json:"id"`
+					CoverageStatus string `json:"coverageStatus"`
+					HomeTeam       struct {
+						SubscriptionsCount int `json:"subscriptionsCount"`
+					} `json:"homeTeam"`
+					AwayTeam struct {
+						SubscriptionsCount int `json:"subscriptionsCount"`
+					} `json:"awayTeam"`
+				} `json:"games"`
+			} `json:"so5Fixture"`
+		} `json:"so5"`
+	} `json:"football"`
+}
+
 type playerinf struct {
 	Age              int
 	Position         string
@@ -144,6 +206,55 @@ type playerinf struct {
 	PicUrl           string
 	Name             string
 	NationalTeamCode string
+}
+
+type gameinfos struct {
+	Football struct {
+		Game struct {
+			HomeTeam struct {
+				Name       string `json:"name"`
+				PictureUrl string `json:"pictureUrl"`
+				Slug       string `json:"slug"`
+			} `json:"homeTeam"`
+			HomeFormation struct {
+				StartingLineUp [][]struct {
+					Country struct {
+						FlagUrl string `json:"flagUrl"`
+					} `json:"country"`
+					So5Scores []struct {
+						Score float32 `json:"score"`
+					} `json:"so5Scores"`
+				} `json:"startingLineup"`
+			} `json:"homeFormation"`
+			AwayTeam struct {
+				Name       string `json:"name"`
+				PictureUrl string `json:"pictureUrl"`
+				Slug       string `json:"slug"`
+			} `json:"awayTeam"`
+			AwayFormation struct {
+				StartingLineUp [][]struct {
+					Country struct {
+						FlagUrl string `json:"flagUrl"`
+					} `json:"country"`
+					So5Scores []struct {
+						Score float32 `json:"score"`
+					} `json:"so5Scores"`
+				} `json:"startingLineup"`
+			} `json:"awayFormation"`
+		} `json:"game"`
+	} `json:"football"`
+}
+
+type formation struct {
+	name       string
+	pictureUrl string
+	slug       string
+	players    [][]compplayers
+}
+
+type compplayers struct {
+	score      float32
+	countryUrl string
 }
 
 type color string
@@ -216,6 +327,35 @@ func pick[K interface{}](filename string) (K, error) {
 	return ret, nil
 }
 
+func testClub(slug1 string, trys int, today formation) (bytes.Buffer, bool) {
+	var ret bytes.Buffer
+	winner := slug1 == today.slug
+	i := 0
+	ret.WriteString(`<div class="field">`)
+	for _, line := range today.players {
+		ret.WriteString(`<div class="row">`)
+		for _, player := range line {
+			if i >= trys && !winner {
+				ret.WriteString(`<div class="player"><img src="` + player.countryUrl + `" class="hidden"><div class="score">` + fmt.Sprintf("%v", player.score) + `</div></div>`)
+			} else {
+				ret.WriteString(`<div class="player"><img src="` + player.countryUrl + `"><div class="score">` + fmt.Sprintf("%v", player.score) + `</div></div>`)
+			}
+			i++
+		}
+		ret.WriteString(`</div>`)
+	}
+	ret.WriteString(`</div>`)
+	if winner {
+		ret.WriteString(fmt.Sprintf(`
+			<div class="winner" id="winner">
+				<h2>Good Job ! You found <span>%s</span> in %d trys ! <a href="/classic">Now try the classic version !</a>
+			</div>
+		`, today.name, trys))
+		numberOfFound++
+	}
+	return ret, winner
+}
+
 func comparePlayerInformations(slug1, slug2 string, trys int) (bytes.Buffer, bool) {
 	var ret bytes.Buffer
 	ch := make(chan playerinf, 2)
@@ -284,7 +424,7 @@ func comparePlayerInformations(slug1, slug2 string, trys int) (bytes.Buffer, boo
 	if winner {
 		ret.WriteString(fmt.Sprintf(`
 			<div class="winner" id="winner">
-				<h2>Good Job ! You found <span>%s</span> in %d trys !
+				<h2>Good Job ! You found <span>%s</span> in %d trys ! <a href="/comp">Now try the composition version !</a>
 			</div>
 		`, p2.Name, trys))
 		numberOfFound++
@@ -356,6 +496,25 @@ func getPlayerInformations(slug string, res chan playerinf) {
 	res <- ret
 }
 
+func getAllClubs() []clubinfos {
+	leagues := getAllLeagues()
+	var clubs []clubinfos
+	wg := sync.WaitGroup{}
+	mu := &sync.Mutex{}
+	for _, l := range leagues {
+		wg.Add(1)
+		go func(slug string) {
+			defer wg.Done()
+			c := getAllClubsFromCompetition(slug)
+			mu.Lock()
+			clubs = append(clubs, c...)
+			mu.Unlock()
+		}(l)
+	}
+	wg.Wait()
+	return clubs
+}
+
 func getNMostSubscribedPlayers(n int) []playersub {
 	leagues := getAllLeagues()
 	var clubs []string
@@ -367,7 +526,9 @@ func getNMostSubscribedPlayers(n int) []playersub {
 			defer wg.Done()
 			c := getAllClubsFromCompetition(slug)
 			mu.Lock()
-			clubs = append(clubs, c...)
+			for _, cl := range c {
+				clubs = append(clubs, cl.Slug)
+			}
 			mu.Unlock()
 		}(l)
 	}
@@ -426,7 +587,12 @@ func getAllLeagues() []string {
 	return ret
 }
 
-func getAllClubsFromCompetition(slug string) []string {
+type clubinfos struct {
+	Slug string
+	Name string
+}
+
+func getAllClubsFromCompetition(slug string) []clubinfos {
 	q := graphql.NewRequest(`
 	query($slug: String!) {
 		football {
@@ -434,6 +600,7 @@ func getAllClubsFromCompetition(slug string) []string {
 				clubs {
 					nodes {
 						slug
+						name
 					}
 				}
 			}
@@ -442,9 +609,9 @@ func getAllClubsFromCompetition(slug string) []string {
 	`)
 	q.Var("slug", slug)
 	res, _ := callSorareApi[competition](q)
-	var ret []string
+	var ret []clubinfos
 	for _, c := range res.Football.Competition.Clubs.Nodes {
-		ret = append(ret, c.Slug)
+		ret = append(ret, clubinfos{Slug: c.Slug, Name: c.Name})
 	}
 	return ret
 }
@@ -474,6 +641,132 @@ func getPlayersFromClub(slug string) []playersub {
 	for _, p := range res.Football.Club.ActivePlayers.Nodes {
 		if len(p.CardSupply) > 0 {
 			ret = append(ret, playersub{Slug: p.Slug, Subscriptions: p.Subscriptions, DisplayName: p.DisplayName})
+		}
+	}
+	return ret
+}
+
+func getLastGameWeek() string {
+	q := graphql.NewRequest(`
+		query {
+			football {
+				so5 {
+					featuredSo5Fixtures(first:3) {
+						slug
+					}
+				}
+			}
+		}
+	`)
+	res, _ := callSorareApi[featured](q)
+	return res.Football.So5.FeaturedSo5Fixtures[2].Slug
+}
+
+func getGamesFromGameweek(slug string) []string {
+	q := graphql.NewRequest(`
+		query($slug: String!) {
+			football {
+				so5 {
+					so5Fixture(slug:$slug) {
+						games {
+							id
+							coverageStatus
+							homeTeam {
+								... on Club {
+								  subscriptionsCount
+								}
+							  }
+							awayTeam {
+								... on Club {
+								  subscriptionsCount
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	`)
+	q.Var("slug", slug)
+	res, _ := callSorareApi[games](q)
+	var ret []string
+	for _, g := range res.Football.So5.So5Fixture.Games {
+		if g.CoverageStatus == "FULL" && g.HomeTeam.SubscriptionsCount > 1000 && g.AwayTeam.SubscriptionsCount > 1000 {
+			ret = append(ret, g.Id[5:])
+		}
+	}
+	return ret
+}
+
+func getGameInfos(id string, isHome bool) formation {
+	q := graphql.NewRequest(`
+		query($slug: ID!) {
+			football {
+				game(id:$slug) {
+					homeTeam {
+						... on Club {
+							name
+							pictureUrl
+							slug
+						}
+					}
+					awayTeam {
+						... on Club {
+							name
+							pictureUrl
+							slug
+						}
+					}
+					homeFormation {
+						startingLineup {
+							country {
+								flagUrl
+							}
+							so5Scores(last:1) {
+								score
+							}
+						}
+					}
+					awayFormation {
+						startingLineup {
+							country {
+								flagUrl
+							}
+							so5Scores(last:1) {
+								score
+							}
+						}
+					}
+				}
+			}
+		}
+	`)
+	q.Var("slug", id)
+	res, _ := callSorareApi[gameinfos](q)
+	var ret formation
+	if isHome {
+		ret.name = res.Football.Game.HomeTeam.Name
+		ret.slug = res.Football.Game.HomeTeam.Slug
+		ret.pictureUrl = res.Football.Game.HomeTeam.PictureUrl
+		ret.players = make([][]compplayers, 0)
+		for _, l := range res.Football.Game.HomeFormation.StartingLineUp {
+			line := make([]compplayers, 0)
+			for _, p := range l {
+				line = append(line, compplayers{score: p.So5Scores[0].Score, countryUrl: p.Country.FlagUrl})
+			}
+			ret.players = append(ret.players, line)
+		}
+	} else {
+		ret.name = res.Football.Game.AwayTeam.Name
+		ret.slug = res.Football.Game.AwayTeam.Slug
+		ret.pictureUrl = res.Football.Game.AwayTeam.PictureUrl
+		ret.players = make([][]compplayers, 0)
+		for _, l := range res.Football.Game.AwayFormation.StartingLineUp {
+			line := make([]compplayers, 0)
+			for _, p := range l {
+				line = append(line, compplayers{score: p.So5Scores[0].Score, countryUrl: p.Country.FlagUrl})
+			}
+			ret.players = append(ret.players, line)
 		}
 	}
 	return ret
